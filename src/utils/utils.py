@@ -4,6 +4,7 @@ from torchvision import transforms
 import albumentations as A
 from albumentations.pytorch.transforms import ToTensorV2
 import torch.nn.functional as F
+from apex import amp
 
 import numpy as np
 import pandas as pd
@@ -202,7 +203,8 @@ def eval_model(model,eval_loader):
         return .5
     return met
 
-def train(model,epoch,train_loader,loss,opt):
+def train(model,epoch,train_loader,loss,opt,
+        writer = None,sched=None,mixed_pre=False):
     """
     trains a model
 
@@ -219,11 +221,22 @@ def train(model,epoch,train_loader,loss,opt):
         opt.zero_grad()
         output = model(data)
         batch_loss = loss(output,targets)
-        batch_loss.backward()
+        if mixed_pre:
+            with amp.scale_loss(batch_loss,opt) as scaled_loss:
+                scaled_loss.backward()
+        else:
+            batch_loss.backward()
+
         opt.step()
+        if sched: 
+            sched.step()
         
         if i % 100 == 99:
             print('done: {}/{}'.format(i,len(train_loader)))
+            if writer:
+                print('logging to tb')
+                writer.add_scalar('train/loss',batch_loss,
+                        i + epoch*len(train_loader))
         
     print('done epoch: {}'.format(epoch))
 
