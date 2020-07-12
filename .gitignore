@@ -2,4 +2,5 @@
 *.ipynb
 **/ckpts
 **/runs
+notes.txt
 

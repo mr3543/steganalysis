@@ -248,6 +248,8 @@ def get_net(net_type,pred_targets):
 
     gets a pretrained efficient net
     """
+    if net_type == 'efficientnet-b2': out_layers=1408
+    elif net_type == 'efficientnet-b7': out_layers = 2560
     net = EfficientNet.from_pretrained(net_type)
-    net._fc = nn.Linear(in_features=1408, out_features=pred_targets, bias=True)
+    net._fc = nn.Linear(in_features=out_layers, out_features=pred_targets, bias=True)
     return net

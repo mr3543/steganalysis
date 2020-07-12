@@ -5,6 +5,7 @@ import albumentations as A
 from albumentations.pytorch.transforms import ToTensorV2
 import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
+from apex import amp
 
 import numpy as np
 import pandas as pd
@@ -44,14 +45,14 @@ def seed_everything(seed):
 seed_everything(SEED)
 
 # create metadata dataset
-experiment_name = 'enet-b2-binary'
+experiment_name = 'enet-b7-onecyc'
 data_root = '/home/mmr/kaggle/data/steganalysis/data'
 dataset = build_dataset(data_root)
 
 # create train/test datasets
 test_fold = 0
-train_sample_frac = 0.04
-test_sample_frace = 0.04
+train_sample_frac = 0.50
+test_sample_frace = 0.50
 
 
 train_data_sample,test_data_sample = train_test_split(
@@ -60,18 +61,20 @@ train_data_sample,test_data_sample = train_test_split(
 train_transform = get_train_transforms()
 test_transform  = get_valid_transforms()
 
-train_im_dataset = IMDataset(train_data_sample,
-        data_root,train_transform,True)
-test_im_dataset  = IMDataset(test_data_sample,
-        data_root,test_transform,True)
+train_im_dataset = IMDataset(train_data_sample,data_root,train_transform)
+test_im_dataset  = IMDataset(test_data_sample,data_root,test_transform)
 
 # create model, loss, optimizer
-num_classes = 2
-model = get_net('efficientnet-b2',num_classes).cuda()
+num_classes = 4
+model = get_net('efficientnet-b7',num_classes).cuda()
 opt = torch.optim.Adam(model.parameters(),lr=3e-4)
 loss = LabelSmoothing(num_classes)
 
-batch_size = 8
+model,opt = amp.initialize(
+        model,opt,opt_level="O2",
+        keep_batchnorm_fp32=True,loss_scale='dynamic')
+
+batch_size = 4
 num_loader_workers = 4
 
 train_loader = torch.utils.data.DataLoader(train_im_dataset,
@@ -83,16 +86,22 @@ test_loader  = torch.utils.data.DataLoader(test_im_dataset,
 # training loop
 num_epochs = 15
 sample_frac = 0.1
-writer = SummaryWriter('runs/steganalysis' +
-        '/' + experiment_name + '/' + strftime("%Y%m%d-%H%M%S"))
-ckpt_path = '/home/mmr/kaggle/steganalysis/ckpts'
+writer = SummaryWriter('runs/steganalysis' + '/' + 
+        experiment_name + '/' + strftime("%Y%m%d-%H%M%S"))
+
+sched = torch.optim.lr_scheduler.OneCycleLR(
+        opt,max_lr=0.01,steps_per_epoch=len(train_loader),
+        epochs=num_epochs)
+
+ckpt_path = '/home/mmr/kaggle/steganalysis/ckpts/' + experiment_name
 
 for epoch in range(num_epochs):
 
     t0 = time.time()
     # train model 
     train(model,epoch,train_loader,loss,opt,
-            writer=writer)
+            writer=writer,sched=sched,mixed_pre=True)
+
     
     """
     # sample train_dataset for eval
@@ -105,9 +114,11 @@ for epoch in range(num_epochs):
     """
     train_met = eval_model(model,train_loader)
     test_met  = eval_model(model,test_loader)
+    print('train met: ',train_met)
+    print('test met: ',test_met)
 
-    writer.add_scalar(experiment_name + '/train/auc',train_met,epoch)
-    writer.add_scalar(experiment_name + '/test/auc',test_met,epoch)
+    writer.add_scalar('/train/auc',train_met,epoch)
+    writer.add_scalar('/test/auc',test_met,epoch)
 
     ckpt_file = ckpt_path + '/model_{}.pt'.format(epoch)
     torch.save({
@@ -118,3 +129,4 @@ for epoch in range(num_epochs):
 
     t1 = time.time()
     print('epoch {}, time: {:0.2f} mins'.format(epoch,(t1-t0)/60))
+
