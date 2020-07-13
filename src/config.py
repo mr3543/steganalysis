@@ -9,7 +9,7 @@ class Config:
         time_now = strftime("%Y%m%d-%H%M%S")
 
         # data root and name of current experiment 
-        self.data_root = '/home/mmr/kaggle/data/steganalysis/data'
+        self.data_root = '/root/data'
         self.experiment_name = 'enet-b7-baseline'
 
         # portion of the data to sample for training and testing
@@ -23,7 +23,7 @@ class Config:
         self.test_eval_sample_frac  = 1.0
 
         # checkpoint directory 
-        self.ckpt_dir = '/home/mmr/kaggle/steganalysis/ckpts/' + \
+        self.ckpt_dir = '/root/steganalysis/ckpts/' + \
                 self.experiment_name + time_now
 
         if not os.path.isdir(self.ckpt_dir):
@@ -33,7 +33,14 @@ class Config:
         self.writer_dir = '/home/mmr/kaggle/steganalysis/runs/' + \
                 self.experiment_name + time_now
         
+        self.loss_log_file = '/root/steganalysis/runs/loss_log_' \
+                + self.experiment_name + time_now + '.csv'
 
+        self.train_metric_log_file = '/root/steganalysis/runs/train_metric_log_' \
+                + self.experiment_name + time_now + '.csv'
+
+        self.test_metric_log_file = '/root/steganalysis/runs/test_metric_log_' \
+                + self.experiment_name + time_now + '.csv'
         # learning rate and momentum for Adam optimizer 
         self.lr = 3e-4
         self.momentum = .9
@@ -48,14 +55,14 @@ class Config:
         self.enet = 'efficientnet-b7'
 
         # batch size and training workers 
-        self.batch_size = 4
+        self.batch_size = 32
         self.num_workers = 4
 
         # num epochs
         self.num_epochs = 30 
 
         # mixed precision training
-        self.mixed_pre = True
+        self.mixed_pre = False
 
 
 

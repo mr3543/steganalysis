@@ -4,7 +4,6 @@ from torchvision import transforms
 import albumentations as A
 from albumentations.pytorch.transforms import ToTensorV2
 import torch.nn.functional as F
-from apex import amp
 
 import numpy as np
 import pandas as pd
@@ -18,6 +17,7 @@ import random
 import glob 
 import gc
 import pdb
+import sys
 
 from src.data.dataset import IMDataset
 
@@ -230,14 +230,11 @@ def train(model,epoch,train_loader,loss,opt,
         opt.step()
         if sched: 
             sched.step()
-        
         if i % 100 == 99:
             print('done: {}/{}'.format(i,len(train_loader)))
             if writer:
                 print('logging to tb')
-                writer.add_scalar('train/loss',batch_loss,
-                        i + epoch*len(train_loader))
-        
+                writer.write(i,batch_loss.item())
     print('done epoch: {}'.format(epoch))
 
 def get_net(net_type,pred_targets):
